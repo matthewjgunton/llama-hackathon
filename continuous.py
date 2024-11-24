@@ -18,6 +18,10 @@ from transformers import AutoProcessor, SeamlessM4Tv2Model
 from threading import Thread
 from queue import Queue
 import warnings
+import traceback
+import ollama
+
+from mlx_lm import load, generate
 warnings.filterwarnings("ignore")
 
 class ContinuousTranslator:
@@ -58,7 +62,8 @@ class ContinuousTranslator:
             dtype='float32'
         )
         sd.wait()
-        return torch.tensor(recording.T)  # Send directly to correct device
+        audio_tensor = torch.tensor(recording.T)
+        return audio_tensor  # Send directly to correct device
 
     def translate_audio(self, audio):
         """Translate audio chunk using the ML model"""
@@ -67,8 +72,6 @@ class ContinuousTranslator:
                 # Move inputs to the correct device
             audio_inputs = {k: v.to(self.device) if isinstance(v, torch.Tensor) else v 
                               for k, v in audio_inputs.items()}
-            
-            ### testing if I can pull out the text and then continue
 
             output_tokens = self.model.generate(
                 **audio_inputs,
@@ -81,7 +84,9 @@ class ContinuousTranslator:
             )
             return translated_text
         except Exception as e:
-            return f"Translation error: {str(e)}"
+            error_message = f"Translation error: {str(e)}"
+            stack_trace = traceback.format_exc()
+            return f"{error_message}\n{stack_trace}"
         finally:
             # Clear CUDA cache if using GPU
             if self.device.type == "cuda":
@@ -130,8 +135,8 @@ class ContinuousTranslator:
 
 def main():
     translator = ContinuousTranslator(
-        target_language="spa",  # Spanish
-        chunk_duration=2,       # 2 seconds
+        target_language="eng",  # Spanish
+        chunk_duration=5,       # 2 seconds
         sample_rate=16000      # 16kHz
     )
 
@@ -142,6 +147,18 @@ def main():
 
     except KeyboardInterrupt:
         translator.stop()
+
+    response = ollama.chat(model='llama3.2:1b', messages=[
+                {
+                    "role": "system",
+                    "content": "Point out if what the user should look out for in this transcript. Is this likely a scam?"
+                },
+                {
+                    "role": "user",
+                    "content": translator.transcript
+                }
+                ])
+    print(response['message']['content'])
 
 if __name__ == "__main__":
     main()

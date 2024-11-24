@@ -83,3 +83,16 @@ no dude en hacérmelo saber.
 
 
 I talk >>> sent over internet >>> model processes >>> sends back
+
+
+## Test:
+(all in Spanish)
+- Hello-- who is this?
+- Hi! Great to talk with you again!
+- According to all known laws of aviation, there is no way that a bee should be able to fly. Its wings are too small to get its fat little body off the ground. The bee, of course, flies anyways. Because bees don't care what humans think is impossible.
+
+(all in punjabi)
+- Hello-- who is this?
+- Hi! Great to talk with you again!
+- According to all known laws of aviation, there is no way that a bee should be able to fly. Its wings are too small to get its fat little body off the ground. The bee, of course, flies anyways. Because bees don't care what humans think is impossible.
+
