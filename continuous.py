@@ -20,8 +20,8 @@ from queue import Queue
 import warnings
 import traceback
 import ollama
+import whisper
 
-from mlx_lm import load, generate
 warnings.filterwarnings("ignore")
 
 class ContinuousTranslator:
@@ -32,6 +32,7 @@ class ContinuousTranslator:
         self.is_running = False
         self.audio_queue = Queue()
         self.transcript = ""
+        self.audio_model = whisper.load_model("base.en")
         self.device = self._get_best_device()
         
         # Initialize ML models
@@ -68,20 +69,17 @@ class ContinuousTranslator:
     def translate_audio(self, audio):
         """Translate audio chunk using the ML model"""
         try:
-            audio_inputs = self.processor(audios=audio, return_tensors="pt")
-                # Move inputs to the correct device
-            audio_inputs = {k: v.to(self.device) if isinstance(v, torch.Tensor) else v 
-                              for k, v in audio_inputs.items()}
-
-            output_tokens = self.model.generate(
-                **audio_inputs,
-                tgt_lang=self.target_language,
-                generate_speech=False
-            )
-            translated_text = self.processor.decode(
-                output_tokens[0].tolist()[0],
-                skip_special_tokens=True
-            )
+            audio_np = audio.cpu().numpy()
+            
+            # Normalize and prepare for transcription
+            audio_np = audio_np.astype(np.float32)
+            if audio_np.ndim > 1:
+                audio_np = audio_np.squeeze()
+            
+            # Transcribe the audio
+            result = self.audio_model.transcribe(audio_np, fp16=torch.cuda.is_available())
+            translated_text = result['text'].strip()
+            
             return translated_text
         except Exception as e:
             error_message = f"Translation error: {str(e)}"
@@ -92,11 +90,23 @@ class ContinuousTranslator:
             if self.device.type == "cuda":
                 torch.cuda.empty_cache()
 
+    def is_silence(self, audio, threshold=0.01):
+        """
+        Determine if the audio is silent based on RMS (Root Mean Square) energy.
+        Processes a copy of the tensor on the CPU to avoid modifying the original.
+        """
+        # Copy the tensor to CPU for processing
+        audio_cpu = audio.detach().to("cpu") if audio.device != torch.device("cpu") else audio.detach()
+        rms = np.sqrt(np.mean(audio_cpu.numpy() ** 2))
+        return rms < threshold
+
+
     def recording_worker(self):
         """Worker function to continuously record audio"""
         while self.is_running:
             audio = self.record_audio_chunk()
-            self.audio_queue.put(audio)
+            if not self.is_silence(audio):
+                self.audio_queue.put(audio)
 
     def translation_worker(self):
         """Worker function to process and translate audio chunks"""
@@ -128,10 +138,6 @@ class ContinuousTranslator:
         self.record_thread.join()
         self.translate_thread.join()
         print("\nStopped continuous translation")
-
-# Example usage
-
-# inference llama3.2 and see if this is likely a scam
 
 def main():
     translator = ContinuousTranslator(
