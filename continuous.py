@@ -1,14 +1,3 @@
-"""
-Current issues:
-- it sometimes misses information when the chunk is too small
-    - testing: speak for 5 seconds straight and see what it sees
-- difficulty with a web interface
-- goal is for 2 people to talk to the website & it shows them what they said
-    - is the first input enough to get the base language?
-- 
-- 
-- 
-"""
 import sounddevice as sd
 import soundfile as sf
 import torch
