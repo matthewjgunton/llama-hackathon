@@ -52,6 +52,24 @@ class ContinuousTranslator:
         else:
             print("Using CPU")
             return torch.device("cpu")
+        
+    def is_silence(self, audio, threshold=0.01):
+        """
+        Determine if the audio is silent based on RMS (Root Mean Square) energy.
+        Processes a copy of the tensor on the CPU to avoid modifying the original.
+        """
+        # Copy the tensor to CPU for processing
+        audio_cpu = audio.detach().to("cpu") if audio.device != torch.device("cpu") else audio.detach()
+        rms = np.sqrt(np.mean(audio_cpu.numpy() ** 2))
+        return rms < threshold
+
+
+    def recording_worker(self):
+        """Worker function to continuously record audio"""
+        while self.is_running:
+            audio = self.record_audio_chunk()
+            if not self.is_silence(audio):
+                self.audio_queue.put(audio)
 
     def record_audio_chunk(self):
         """Record a chunk of audio"""
@@ -68,7 +86,7 @@ class ContinuousTranslator:
     def translate_audio(self, audio):
         """Translate audio chunk using the ML model"""
         try:
-            audio_inputs = self.processor(audios=audio, return_tensors="pt")
+            audio_inputs = self.processor(audios=audio, return_tensors="pt", sampling_rate=16000)
                 # Move inputs to the correct device
             audio_inputs = {k: v.to(self.device) if isinstance(v, torch.Tensor) else v 
                               for k, v in audio_inputs.items()}
@@ -135,7 +153,7 @@ class ContinuousTranslator:
 
 def main():
     translator = ContinuousTranslator(
-        target_language="eng",  # Spanish
+        target_language="pan",  # Spanish
         chunk_duration=5,       # 2 seconds
         sample_rate=16000      # 16kHz
     )
